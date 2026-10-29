@@ -15,20 +15,22 @@ EXCLUDED_ROOMS = {
 }
 
 BUILDINGS = {
-    "ALL": "All Buildings",
-    "GLA.FT": "Polaris (FT)",
-    "GLA.S": "Stokes (S)",
-    "GLA.SA": "Stokes Ext (SA)",
-    "GLA.L": "McNulty (L)",
+    "ALL": "All Glasnevin Buildings",
+    "GLA.FT": "Polaris Building (FT)",
+    "GLA.S": "Stokes Building (S)",
+    "GLA.SA": "Stokes Extension (SA)",
+    "GLA.L": "McNulty / Computing (L)",
     "GLA.C": "Henry Grattan (C)",
-    "GLA.CA": "Grattan Ext (CA)",
-    "GLA.Q": "Business School (Q)",
-    "GLA.X": "Lonsdale (X)",
-    "GLA.H": "Nursing (H)",
-    "GLA.N": "Engineering (N)",
+    "GLA.CA": "Henry Grattan Extension (CA)",
+    "GLA.Q": "DCU Business School (Q)",
+    "GLA.X": "Lonsdale / Science (X)",
+    "GLA.H": "Alice Reeves / Nursing (H)",
+    "GLA.N": "Marconi / Engineering (N)",
     "GLA.A": "Albert College (A)",
-    "GLA.T": "Larkin Theatre (T)",
-    "GLA.F": "Maths (F)",
+    "GLA.D": "Bea Orpen (D)",
+    "GLA.T": "Terence Larkin Theatre (T)",
+    "GLA.F": "Mathematical Sciences (F)",
+    "GLA.P": "Pavilion / Invent (P)",
     "GLA.Y": "Library / O'Reilly (Y)",
 }
 
@@ -38,6 +40,7 @@ def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool
 
     target_iso = target_dt.strftime("%Y-%m-%dT%H:%M:%S")
 
+    # Fetch room query
     query = "SELECT id, name, parent_categories FROM rooms WHERE "
     params = []
 
@@ -56,10 +59,13 @@ def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool
     cursor.execute(query, params)
     all_rooms = cursor.fetchall()
 
+    # Filter out blacklisted pods
     valid_rooms = [r for r in all_rooms if r[1] not in EXCLUDED_ROOMS]
+
     vacant_results = []
 
     for r_id, r_name, _ in valid_rooms:
+        # Check if occupied at target_dt
         cursor.execute("""
             SELECT start_iso, end_iso FROM bookings 
             WHERE room_id = ? 
@@ -70,6 +76,7 @@ def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool
         current_booking = cursor.fetchone()
 
         if not current_booking:
+            # Room is free! Find next booking starting after target_dt on same day
             end_of_day = target_dt.strftime("%Y-%m-%dT23:59:59")
             cursor.execute("""
                 SELECT start_iso FROM bookings 
@@ -90,7 +97,7 @@ def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool
                 dur_str = f"{hours}h {minutes}m" if hours > 0 else f"{minutes}m"
                 free_until_str = f"Free until {next_start_dt.strftime('%H:%M')} ({dur_str} left)"
             else:
-                free_until_str = "Free for the rest of the day"
+                free_until_str = "Free for rest of the day"
 
             vacant_results.append({
                 "id": r_id,
@@ -119,7 +126,7 @@ def api_vacant():
     return jsonify({
         "vacant": vacant,
         "total": total,
-        "query_time": target_dt.strftime("%a, %b %d • %H:%M")
+        "query_time": target_dt.strftime("%A, %b %d at %H:%M")
     })
 
 @app.route("/")
@@ -129,206 +136,128 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <title>DCU Room Finder</title>
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>DCU Vacant Lecture Halls</title>
         <script src="https://cdn.tailwindcss.com"></script>
-        <link rel="preconnect" href="https://fonts.googleapis.com">
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-        <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
         <style>
-            body { 
-                font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif; 
-                -webkit-tap-highlight-color: transparent;
-            }
-            .hide-scrollbar::-webkit-scrollbar { display: none; }
-            .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            body { font-family: 'Inter', sans-serif; }
         </style>
     </head>
-    <body class="bg-[#F8FAFC] text-slate-800 min-h-screen pb-12 antialiased">
-        
-        <!-- Sticky Header -->
-        <header class="sticky top-0 z-30 bg-[#1A3C66] text-white px-5 py-4 shadow-md">
-            <div class="max-w-xl mx-auto flex items-center justify-between">
+    <body class="bg-slate-900 text-slate-100 min-h-screen">
+        <div class="max-w-4xl mx-auto px-4 py-8">
+            <!-- Header -->
+            <div class="flex items-center justify-between border-b border-slate-800 pb-6 mb-8">
                 <div>
-                    <h1 class="text-xl font-bold tracking-tight">DCU Room Finder</h1>
-                    <p class="text-xs text-blue-200 mt-0.5">Glasnevin Campus Vacancies</p>
+                    <h1 class="text-3xl font-bold tracking-tight text-white flex items-center gap-3">
+                        <span class="bg-blue-600 text-white p-2 rounded-xl text-xl">🏛️</span>
+                        DCU Room Finder
+                    </h1>
+                    <p class="text-slate-400 text-sm mt-1">Real-time vacant lecture theatre scanner for Glasnevin</p>
                 </div>
-                <div id="liveBadge" class="flex items-center gap-1.5 bg-white/10 px-3 py-1 rounded-full text-xs font-medium text-blue-100 backdrop-blur-sm">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
-                    Live
+                <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3 py-1.5 rounded-full text-xs font-semibold">
+                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
+                    Live Schedule Sync
                 </div>
             </div>
-        </header>
 
-        <main class="max-w-xl mx-auto px-4 pt-5 space-y-5">
-            
-            <!-- Controls Card -->
-            <div class="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 space-y-4">
-                
-                <!-- Horizontal Scrollable Building Selector -->
-                <div>
-                    <label class="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-2">Building</label>
-                    <div class="flex gap-2 overflow-x-auto hide-scrollbar -mx-1 px-1 py-1" id="buildingChips">
-                        {% for code, label in buildings.items() %}
-                        <button 
-                            data-code="{{ code }}"
-                            class="building-chip whitespace-nowrap px-3.5 py-2 rounded-xl text-xs font-semibold transition border border-slate-200 text-slate-600 bg-slate-50 active:scale-95 flex-shrink-0 first:ml-0"
-                        >
-                            {{ label }}
-                        </button>
-                        {% endfor %}
+            <!-- Controls Panel -->
+            <div class="bg-slate-800/60 border border-slate-700/60 rounded-2xl p-6 mb-8 backdrop-blur-xl shadow-xl">
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <!-- Building Select -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Select Building</label>
+                        <select id="buildingSelect" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            {% for code, label in buildings.items() %}
+                            <option value="{{ code }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+                    <!-- Date/Time Mode -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Target Time</label>
+                        <select id="timeMode" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <option value="now">Right Now (Live)</option>
+                            <option value="custom">Custom Date & Time</option>
+                        </select>
+                    </div>
+
+                    <!-- Custom Datetime Picker (Hidden by default) -->
+                    <div id="customTimeWrapper" class="hidden">
+                        <label class="block text-xs font-medium text-slate-400 mb-1.5">Pick Date & Time</label>
+                        <input type="datetime-local" id="customDatetime" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
                     </div>
                 </div>
 
-                <hr class="border-slate-100">
-
-                <!-- Time Filter Bar -->
-                <div class="space-y-3">
-                    <div class="flex items-center justify-between">
-                        <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">When</span>
-                        
-                        <!-- Toggle Buttons -->
-                        <div class="bg-slate-100 p-1 rounded-xl flex gap-1">
-                            <button id="btnTimeNow" class="px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm transition">
-                                Now
-                            </button>
-                            <button id="btnTimeCustom" class="px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition">
-                                Later
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Custom Picker Box -->
-                    <div id="customTimeBox" class="hidden pt-1">
-                        <input 
-                            type="datetime-local" 
-                            id="customDatetime" 
-                            class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-sm font-medium rounded-xl px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-[#1A3C66] focus:border-transparent"
-                        >
-                    </div>
-                </div>
-
-                <!-- Lecture Theatre Checkbox -->
-                <div class="pt-2 flex items-center justify-between text-xs text-slate-600 border-t border-slate-100">
-                    <label for="theatresOnly" class="flex items-center gap-2 cursor-pointer py-1 font-medium select-none">
-                        <input type="checkbox" id="theatresOnly" checked class="w-4 h-4 rounded text-[#1A3C66] focus:ring-[#1A3C66] border-slate-300">
-                        Lecture halls only
+                <!-- Toggle Options -->
+                <div class="mt-4 pt-4 border-t border-slate-700/40 flex items-center justify-between">
+                    <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
+                        <input type="checkbox" id="theatresOnly" checked class="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-blue-500 focus:ring-offset-slate-800">
+                        Official Lecture Theatres Only
                     </label>
-                    <button id="refreshBtn" class="text-xs font-bold text-[#1A3C66] hover:underline px-1 py-1">
-                        Update
+                    <button id="searchBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-medium text-sm px-5 py-2 rounded-xl transition shadow-lg shadow-blue-600/20">
+                        Update Results
                     </button>
                 </div>
-
             </div>
 
-            <!-- Results Section Header -->
-            <div class="flex items-center justify-between px-1">
-                <div>
-                    <h2 class="text-base font-bold text-slate-900" id="statusHeading">Available Rooms</h2>
-                    <p class="text-xs text-slate-500 font-medium mt-0.5" id="querySummary">Loading...</p>
-                </div>
-                <span id="roomCountBadge" class="bg-blue-50 text-[#1A3C66] text-xs font-bold px-3 py-1 rounded-full border border-blue-100">
-                    -- Free
-                </span>
+            <!-- Status Banner -->
+            <div class="flex items-center justify-between mb-4 px-1">
+                <h2 id="querySummary" class="text-slate-300 font-medium text-sm">Searching...</h2>
+                <span id="roomCountBadge" class="text-xs bg-slate-800 text-slate-400 px-2.5 py-1 rounded-lg border border-slate-700">0 Rooms Found</span>
             </div>
 
-            <!-- Results List -->
-            <div id="resultsGrid" class="space-y-3">
-                <!-- Room items rendered dynamically -->
+            <!-- Results Grid -->
+            <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Cards injected dynamically -->
             </div>
-
-        </main>
+        </div>
 
         <script>
-            let currentBuilding = 'ALL';
-            let timeMode = 'now';
-
-            // Initialize building chips
-            const chips = document.querySelectorAll('.building-chip');
-            chips.forEach(chip => {
-                if (chip.dataset.code === currentBuilding) {
-                    chip.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-200');
-                    chip.classList.add('bg-[#1A3C66]', 'text-white', 'border-[#1A3C66]');
-                }
-
-                chip.addEventListener('click', () => {
-                    chips.forEach(c => {
-                        c.classList.remove('bg-[#1A3C66]', 'text-white', 'border-[#1A3C66]');
-                        c.classList.add('bg-slate-50', 'text-slate-600', 'border-slate-200');
-                    });
-                    chip.classList.remove('bg-slate-50', 'text-slate-600', 'border-slate-200');
-                    chip.classList.add('bg-[#1A3C66]', 'text-white', 'border-[#1A3C66]');
-                    currentBuilding = chip.dataset.code;
-                    fetchVacantRooms();
-                });
-            });
-
-            // Set local default time for datetime-local
+            // Set default datetime to now in local ISO string format
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
-            document.getElementById('customDatetime').value = now.toISOString().slice(0, 16);
+            document.getElementById('customDatetime').value = now.toISOString().slice(0,16);
 
-            // Time Mode Toggle
-            const btnTimeNow = document.getElementById('btnTimeNow');
-            const btnTimeCustom = document.getElementById('btnTimeCustom');
-            const customTimeBox = document.getElementById('customTimeBox');
-
-            btnTimeNow.addEventListener('click', () => {
-                timeMode = 'now';
-                btnTimeNow.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm transition';
-                btnTimeCustom.className = 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
-                customTimeBox.classList.add('hidden');
-                document.getElementById('liveBadge').classList.remove('opacity-40');
-                fetchVacantRooms();
+            document.getElementById('timeMode').addEventListener('change', (e) => {
+                const customWrap = document.getElementById('customTimeWrapper');
+                if (e.target.value === 'custom') {
+                    customWrap.classList.remove('hidden');
+                } else {
+                    customWrap.classList.add('hidden');
+                }
             });
-
-            btnTimeCustom.addEventListener('click', () => {
-                timeMode = 'custom';
-                btnTimeCustom.className = 'px-3 py-1 rounded-lg text-xs font-semibold bg-white text-slate-900 shadow-sm transition';
-                btnTimeNow.className = 'px-3 py-1 rounded-lg text-xs font-semibold text-slate-600 hover:text-slate-900 transition';
-                customTimeBox.classList.remove('hidden');
-                document.getElementById('liveBadge').classList.add('opacity-40');
-                fetchVacantRooms();
-            });
-
-            document.getElementById('customDatetime').addEventListener('change', () => {
-                if (timeMode === 'custom') fetchVacantRooms();
-            });
-
-            document.getElementById('theatresOnly').addEventListener('change', fetchVacantRooms);
-            document.getElementById('refreshBtn').addEventListener('click', fetchVacantRooms);
 
             async function fetchVacantRooms() {
+                const building = document.getElementById('buildingSelect').value;
+                const timeMode = document.getElementById('timeMode').value;
                 const theatresOnly = document.getElementById('theatresOnly').checked;
-                let dtParam = '';
                 
+                let dtParam = '';
                 if (timeMode === 'custom') {
                     dtParam = document.getElementById('customDatetime').value;
                 }
 
-                const url = `/api/vacant?building=${currentBuilding}&datetime=${dtParam}&theatres_only=${theatresOnly}`;
-                const container = document.getElementById('resultsGrid');
+                const url = `/api/vacant?building=${building}&datetime=${dtParam}&theatres_only=${theatresOnly}`;
                 
-                container.innerHTML = `
-                    <div class="bg-white rounded-2xl p-8 text-center text-slate-400 border border-slate-200/80">
-                        <p class="text-sm font-medium">Checking schedules...</p>
-                    </div>
-                `;
+                const grid = document.getElementById('resultsGrid');
+                grid.innerHTML = '<div class="col-span-2 text-center py-12 text-slate-500">Checking room availability...</div>';
 
                 try {
                     const res = await fetch(url);
                     const data = await res.json();
 
-                    document.getElementById('querySummary').textContent = data.query_time;
-                    document.getElementById('roomCountBadge').textContent = `${data.vacant.length} of ${data.total} Free`;
+                    document.getElementById('querySummary').textContent = `Showing vacancy for ${data.query_time}`;
+                    document.getElementById('roomCountBadge').textContent = `${data.vacant.length} / ${data.total} Free`;
 
-                    container.innerHTML = '';
+                    grid.innerHTML = '';
 
                     if (data.vacant.length === 0) {
-                        container.innerHTML = `
-                            <div class="bg-white rounded-2xl p-8 text-center border border-slate-200/80">
-                                <p class="text-slate-700 font-semibold text-sm">No free rooms right now</p>
-                                <p class="text-slate-400 text-xs mt-1">Try picking a different building or checking another time.</p>
+                        grid.innerHTML = `
+                            <div class="col-span-2 text-center py-12 bg-slate-800/30 rounded-2xl border border-slate-800">
+                                <p class="text-slate-400 text-base font-medium">No vacant halls found for this time slot.</p>
+                                <p class="text-slate-600 text-xs mt-1">Try selecting a different building or checking another time.</p>
                             </div>
                         `;
                         return;
@@ -336,32 +265,31 @@ def index():
 
                     data.vacant.forEach(room => {
                         const card = document.createElement('div');
-                        card.className = 'bg-white rounded-2xl p-4 border border-slate-200/80 shadow-sm flex items-center justify-between gap-3';
+                        card.className = 'bg-slate-800/40 border border-slate-700/50 hover:border-slate-600 transition rounded-2xl p-5 flex items-center justify-between group shadow-sm';
                         card.innerHTML = `
                             <div>
-                                <h3 class="text-base font-bold text-slate-900 tracking-tight">${room.name}</h3>
-                                <p class="text-xs text-emerald-700 font-semibold mt-1 flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
+                                <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition">${room.name}</h3>
+                                <p class="text-xs text-emerald-400 font-medium mt-1 flex items-center gap-1.5">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
                                     ${room.until}
                                 </p>
                             </div>
-                            <span class="flex-shrink-0 bg-emerald-50 text-emerald-700 font-bold text-xs px-2.5 py-1.5 rounded-xl border border-emerald-200/60">
-                                Free
+                            <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold px-3 py-1.5 rounded-xl">
+                                Available
                             </span>
                         `;
-                        container.appendChild(card);
+                        grid.appendChild(card);
                     });
 
                 } catch (err) {
-                    container.innerHTML = `
-                        <div class="bg-rose-50 text-rose-800 rounded-2xl p-4 border border-rose-200 text-xs font-medium text-center">
-                            Failed to load room schedules. Check connection or database status.
-                        </div>
-                    `;
+                    grid.innerHTML = '<div class="col-span-2 text-center py-12 text-rose-400">Error fetching schedule data. Make sure rooms.db is updated.</div>';
                 }
             }
 
-            // Initial fetch
+            document.getElementById('searchBtn').addEventListener('click', fetchVacantRooms);
+            document.getElementById('buildingSelect').addEventListener('change', fetchVacantRooms);
+
+            // Initial load
             fetchVacantRooms();
         </script>
     </body>
