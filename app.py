@@ -34,6 +34,11 @@ BUILDINGS = {
     "GLA.Y": "Library / O'Reilly (Y)",
 }
 
+@app.route("/health")
+def health_check():
+    """Lightweight ping endpoint for uptime monitors."""
+    return "OK", 200
+
 def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool = True):
     conn = sqlite3.connect("rooms.db")
     cursor = conn.cursor()
@@ -126,15 +131,13 @@ def get_programme_timetable(programme_code: str = "COMSCI2", target_date: str = 
         start_dt = datetime.strptime(start_iso[:19], "%Y-%m-%dT%H:%M:%S")
         end_dt = datetime.strptime(end_iso[:19], "%Y-%m-%dT%H:%M:%S")
         
-        # Clean title & determine true session type
-        clean_module = full_mod_name
         if "(" in full_mod_name and full_mod_name.endswith(")"):
             clean_module, raw_type = full_mod_name.rsplit(" (", 1)
             raw_type = raw_type[:-1].upper()
         else:
+            clean_module = full_mod_name
             raw_type = full_mod_name.upper()
 
-        # Classify event format based on keywords and codes
         if "TUTORIAL" in raw_type or "/T" in raw_type or "TUT" in raw_type:
             event_type = "Tutorial"
         elif "PRACTICAL" in raw_type or "LAB" in raw_type or "/P" in raw_type:
@@ -311,7 +314,6 @@ def index():
             const dateInput = document.getElementById('timetableDate');
             dateInput.value = todayIso;
 
-            // Tab Switching
             const tabVacant = document.getElementById('tabVacant');
             const tabTimetable = document.getElementById('tabTimetable');
             const vacantPanel = document.getElementById('vacantPanel');
