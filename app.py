@@ -1,10 +1,12 @@
 import sqlite3
+import os
 from datetime import datetime, timedelta
 from flask import Flask, jsonify, render_template_string, request
 
 app = Flask(__name__)
 
 LECTURE_THEATRE_UUID = "289a88ea-eaf1-e5be-9044-807575b4286a"
+DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "rooms.db")
 
 EXCLUDED_ROOMS = {
     "GLA.HG00",
@@ -31,16 +33,78 @@ BUILDINGS = {
     "GLA.T": "Terence Larkin Theatre (T)",
     "GLA.F": "Mathematical Sciences (F)",
     "GLA.P": "Pavilion / Invent (P)",
-    "GLA.Y": "Library / O'Reilly (Y)",
 }
+
+def init_db():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS rooms (
+            id TEXT PRIMARY KEY,
+            name TEXT,
+            parent_categories TEXT
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS bookings (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            room_id TEXT,
+            start_iso TEXT,
+            end_iso TEXT,
+            FOREIGN KEY(room_id) REFERENCES rooms(id)
+        )
+    """)
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS programme_events (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            programme_code TEXT,
+            module_name TEXT,
+            room_name TEXT,
+            start_iso TEXT,
+            end_iso TEXT
+        )
+    """)
+    conn.commit()
+    conn.close()
 
 @app.route("/health")
 def health_check():
-    """Lightweight ping endpoint for uptime monitors."""
     return "OK", 200
 
+@app.route("/sw.js")
+def service_worker():
+    sw_code = """
+    self.addEventListener('install', (e) => self.skipWaiting());
+    self.addEventListener('activate', (e) => self.clients.claim());
+    self.addEventListener('fetch', (e) => e.respondWith(fetch(e.request)));
+    """
+    return sw_code, 200, {'Content-Type': 'application/javascript'}
+
+@app.route("/manifest.json")
+def manifest():
+    return jsonify({
+        "short_name": "DCU Hub",
+        "name": "DCU Student Hub",
+        "icons": [
+            {
+                "src": "/static/images/icon-192.png",
+                "type": "image/png",
+                "sizes": "192x192"
+            },
+            {
+                "src": "/static/images/icon-512.png",
+                "type": "image/png",
+                "sizes": "512x512"
+            }
+        ],
+        "start_url": "/",
+        "background_color": "#2563eb",
+        "theme_color": "#1d4ed8",
+        "display": "standalone"
+    })
+
 def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool = True):
-    conn = sqlite3.connect("rooms.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     target_iso = target_dt.strftime("%Y-%m-%dT%H:%M:%S")
@@ -49,7 +113,7 @@ def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool
     params = []
 
     if building_code == "ALL":
-        query += "(name LIKE 'GLA.%' OR (name NOT LIKE 'SPC.%' AND name NOT LIKE 'AHC.%')) "
+        query += "(name LIKE 'GLA.%' AND name NOT LIKE 'GLA.Y%') "
     else:
         raw_prefix = building_code.replace("GLA.", "")
         query += "(name LIKE ? OR name LIKE ? OR name LIKE ?) "
@@ -109,7 +173,7 @@ def get_room_status(building_code: str, target_dt: datetime, theatres_only: bool
     return vacant_results, len(valid_rooms)
 
 def get_programme_timetable(programme_code: str = "COMSCI2", target_date: str = None):
-    conn = sqlite3.connect("rooms.db")
+    conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
 
     if not target_date:
@@ -200,107 +264,127 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
         <title>DCU Student Hub</title>
+        <link rel="manifest" href="/manifest.json">
+        <meta name="theme-color" content="#1d4ed8">
+        <meta name="mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-title" content="DCU Hub">
         <script src="https://cdn.tailwindcss.com"></script>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
             body { font-family: 'Plus Jakarta Sans', sans-serif; }
-            .glass { background: rgba(30, 41, 59, 0.7); backdrop-filter: blur(12px); }
+            .card-shadow { box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02); }
         </style>
     </head>
-    <body class="bg-slate-950 text-slate-100 min-h-screen relative overflow-x-hidden">
-        <div class="absolute top-0 left-1/4 w-96 h-96 bg-blue-600/10 rounded-full blur-3xl pointer-events-none"></div>
-        <div class="absolute bottom-0 right-1/4 w-96 h-96 bg-indigo-600/10 rounded-full blur-3xl pointer-events-none"></div>
+    <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
 
-        <div class="max-w-4xl mx-auto px-4 py-8 relative z-10">
-            <!-- Header -->
-            <div class="flex items-center justify-between border-b border-slate-800/80 pb-6 mb-8">
-                <div>
-                    <h1 class="text-3xl font-extrabold tracking-tight text-white flex items-center gap-3">
-                        <span class="bg-blue-600 text-white p-2 rounded-xl text-xl shadow-lg shadow-blue-500/25">🏛️</span>
-                        DCU Student Hub
-                    </h1>
-                    <p class="text-slate-400 text-sm mt-1">Vacant lecture theatre scanner & COMSCI2 timetable</p>
-                </div>
-                <div class="inline-flex items-center gap-2 bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 px-3.5 py-1.5 rounded-full text-xs font-semibold">
-                    <span class="w-2 h-2 rounded-full bg-emerald-400 animate-pulse"></span>
-                    Live Schedule Sync
+        <!-- Header -->
+        <header class="bg-blue-700 text-white shadow-lg sticky top-0 z-50">
+            <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                    <div class="bg-white/10 p-2 rounded-xl backdrop-blur-md">
+                        <img src="/static/images/logo.png" alt="DCU Logo" class="w-8 h-8 object-contain" onerror="this.style.display='none'">
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-extrabold tracking-tight">DCU Student Hub</h1>
+                        <p class="text-blue-200 text-xs font-medium">COMSCI2 & Campus Live Availability</p>
+                    </div>
                 </div>
             </div>
 
             <!-- Navigation Tabs -->
-            <div class="flex space-x-2 mb-6 border-b border-slate-800/80 pb-3">
-                <button id="tabTimetable" class="px-5 py-2.5 rounded-xl font-bold text-sm bg-blue-600 text-white transition shadow-lg shadow-blue-600/20 flex items-center gap-2">
-                    <span>📅</span> COMSCI2 Timetable
+            <div class="max-w-4xl mx-auto px-4 flex space-x-1 pt-2">
+                <button id="tabTimetable" class="px-5 py-3 border-b-2 border-white font-bold text-sm text-white flex items-center gap-2">
+                    Timetable
                 </button>
-                <button id="tabVacant" class="px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-800/80 text-slate-400 hover:text-white transition flex items-center gap-2">
-                    <span>🔍</span> Vacant Halls
+                <button id="tabVacant" class="px-5 py-3 border-b-2 border-transparent font-medium text-sm text-blue-200 hover:text-white flex items-center gap-2">
+                    Vacant Halls
                 </button>
             </div>
+        </header>
 
-            <!-- Panel 1: COMSCI2 Timetable -->
+        <!-- Main Body -->
+        <main class="max-w-4xl mx-auto px-4 py-6 flex-1 w-full">
+
+            <!-- PANEL 1: Timetable -->
             <div id="timetablePanel">
-                <div class="glass border border-slate-800 rounded-2xl p-5 mb-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-xl">
-                    <div class="flex items-center gap-2 w-full sm:w-auto">
-                        <button id="btnToday" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs px-3.5 py-2 rounded-xl transition shadow-md shadow-blue-600/20">Today</button>
-                        <button id="btnTomorrow" class="bg-slate-800 hover:bg-slate-700 text-slate-300 font-semibold text-xs px-3.5 py-2 rounded-xl transition">Tomorrow</button>
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 mb-6 card-shadow space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                        <div class="flex items-center gap-2">
+                            <button id="btnToday" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm">Today</button>
+                            <button id="btnTomorrow" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition">Tomorrow</button>
+                        </div>
+                        <div class="flex items-center gap-2 w-full sm:w-auto cursor-pointer" id="timetableDateWrapper">
+                            <label class="text-xs font-semibold text-slate-500 whitespace-nowrap cursor-pointer">Specific Date:</label>
+                            <input type="date" id="timetableDate" class="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-blue-600 focus:outline-none w-full cursor-pointer">
+                        </div>
                     </div>
-                    <div class="flex items-center gap-3 w-full sm:w-auto">
-                        <label class="text-xs font-semibold text-slate-400 whitespace-nowrap">Select Date:</label>
-                        <input type="date" id="timetableDate" class="bg-slate-900 border border-slate-700 text-white text-sm font-medium rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-blue-500 focus:outline-none w-full">
+
+                    <!-- Week Day Selector Bar -->
+                    <div class="flex items-center justify-between gap-1 pt-1">
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="1">Mon</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="2">Tue</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="3">Wed</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="4">Thu</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="5">Fri</button>
                     </div>
                 </div>
 
-                <div id="timetableList" class="space-y-4"></div>
+                <div id="timetableList" class="space-y-3"></div>
             </div>
 
-            <!-- Panel 2: Vacant Rooms -->
+            <!-- PANEL 2: Vacant Halls -->
             <div id="vacantPanel" class="hidden">
-                <div class="glass border border-slate-800 rounded-2xl p-6 mb-8 shadow-xl">
+                <div class="bg-white border border-slate-200/80 rounded-2xl p-5 mb-6 card-shadow">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1.5">Select Building</label>
-                            <select id="buildingSelect" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Select Building</label>
+                            <select id="buildingSelect" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
                                 {% for code, label in buildings.items() %}
                                 <option value="{{ code }}">{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-semibold text-slate-400 mb-1.5">Target Time Mode</label>
-                            <select id="timeMode" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Target Time Mode</label>
+                            <select id="timeMode" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
                                 <option value="now">Right Now (Live)</option>
                                 <option value="custom">Custom Date & Time</option>
                             </select>
                         </div>
                         <div id="customTimeWrapper" class="hidden">
-                            <label class="block text-xs font-semibold text-slate-400 mb-1.5">Pick Date & Time</label>
-                            <input type="datetime-local" id="customDatetime" class="w-full bg-slate-900 border border-slate-700 text-white text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-500 focus:outline-none">
+                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Pick Date & Time</label>
+                            <input type="datetime-local" id="customDatetime" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
                         </div>
                     </div>
 
-                    <div class="mt-4 pt-4 border-t border-slate-800 flex items-center justify-between">
-                        <label class="flex items-center gap-2 cursor-pointer text-sm text-slate-300">
-                            <input type="checkbox" id="theatresOnly" checked class="w-4 h-4 rounded text-blue-600 bg-slate-900 border-slate-700 focus:ring-blue-500 focus:ring-offset-slate-800">
-                            Official Lecture Theatres Only
+                    <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600">
+                            <input type="checkbox" id="theatresOnly" checked class="w-4 h-4 rounded text-blue-600 bg-slate-100 border-slate-300 focus:ring-blue-600">
+                            Lecture Theatres Only
                         </label>
-                        <button id="searchBtn" class="bg-blue-600 hover:bg-blue-500 text-white font-semibold text-sm px-5 py-2 rounded-xl transition shadow-lg shadow-blue-600/20">
-                            Update Results
+                        <button id="searchBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20">
+                            Update Availability
                         </button>
                     </div>
                 </div>
 
                 <div class="flex items-center justify-between mb-4 px-1">
-                    <h2 id="querySummary" class="text-slate-300 font-medium text-sm">Searching...</h2>
-                    <span id="roomCountBadge" class="text-xs bg-slate-800 text-slate-400 px-3 py-1 rounded-lg border border-slate-700/80">0 Rooms Found</span>
+                    <h2 id="querySummary" class="text-slate-600 font-semibold text-xs">Searching...</h2>
+                    <span id="roomCountBadge" class="text-xs font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">0 Rooms Found</span>
                 </div>
 
-                <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+                <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
             </div>
-        </div>
+        </main>
 
         <script>
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.register('/sw.js');
+            }
+
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             const todayIso = now.toISOString().slice(0,10);
@@ -309,56 +393,109 @@ def index():
             tomorrow.setDate(tomorrow.getDate() + 1);
             const tomorrowIso = tomorrow.toISOString().slice(0,10);
 
-            document.getElementById('customDatetime').value = now.toISOString().slice(0,16);
-            
+            const customDtInput = document.getElementById('customDatetime');
+            customDtInput.value = now.toISOString().slice(0,16);
+
             const dateInput = document.getElementById('timetableDate');
             dateInput.value = todayIso;
 
-            const tabVacant = document.getElementById('tabVacant');
+            // Auto open picker when clicking input or label
+            document.getElementById('timetableDateWrapper').addEventListener('click', () => {
+                if ('showPicker' in HTMLInputElement.prototype) {
+                    dateInput.showPicker();
+                } else {
+                    dateInput.focus();
+                }
+            });
+
             const tabTimetable = document.getElementById('tabTimetable');
-            const vacantPanel = document.getElementById('vacantPanel');
+            const tabVacant = document.getElementById('tabVacant');
+
             const timetablePanel = document.getElementById('timetablePanel');
+            const vacantPanel = document.getElementById('vacantPanel');
+
+            function resetTabs() {
+                [tabTimetable, tabVacant].forEach(t => {
+                    t.className = 'px-5 py-3 border-b-2 border-transparent font-medium text-sm text-blue-200 hover:text-white flex items-center gap-2';
+                });
+                [timetablePanel, vacantPanel].forEach(p => p.classList.add('hidden'));
+            }
 
             tabTimetable.addEventListener('click', () => {
-                tabTimetable.className = 'px-5 py-2.5 rounded-xl font-bold text-sm bg-blue-600 text-white transition shadow-lg shadow-blue-600/20 flex items-center gap-2';
-                tabVacant.className = 'px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-800/80 text-slate-400 hover:text-white transition flex items-center gap-2';
+                resetTabs();
+                tabTimetable.className = 'px-5 py-3 border-b-2 border-white font-bold text-sm text-white flex items-center gap-2';
                 timetablePanel.classList.remove('hidden');
-                vacantPanel.classList.add('hidden');
                 fetchTimetable();
             });
 
             tabVacant.addEventListener('click', () => {
-                tabVacant.className = 'px-5 py-2.5 rounded-xl font-bold text-sm bg-blue-600 text-white transition shadow-lg shadow-blue-600/20 flex items-center gap-2';
-                tabTimetable.className = 'px-5 py-2.5 rounded-xl font-bold text-sm bg-slate-800/80 text-slate-400 hover:text-white transition flex items-center gap-2';
+                resetTabs();
+                tabVacant.className = 'px-5 py-3 border-b-2 border-white font-bold text-sm text-white flex items-center gap-2';
                 vacantPanel.classList.remove('hidden');
-                timetablePanel.classList.add('hidden');
                 fetchVacantRooms();
             });
 
             document.getElementById('btnToday').addEventListener('click', () => {
                 dateInput.value = todayIso;
+                updateWeekSelection(new Date(todayIso).getDay());
                 fetchTimetable();
             });
 
             document.getElementById('btnTomorrow').addEventListener('click', () => {
                 dateInput.value = tomorrowIso;
+                updateWeekSelection(new Date(tomorrowIso).getDay());
                 fetchTimetable();
             });
 
+            document.querySelectorAll('.week-day-btn').forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const targetDay = parseInt(btn.getAttribute('data-day'));
+                    const curr = new Date();
+                    const distance = targetDay - curr.getDay();
+                    const targetDt = new Date(curr.setDate(curr.getDate() + distance));
+                    targetDt.setMinutes(targetDt.getMinutes() - targetDt.getTimezoneOffset());
+                    
+                    dateInput.value = targetDt.toISOString().slice(0,10);
+                    updateWeekSelection(targetDay);
+                    fetchTimetable();
+                });
+            });
+
+            function updateWeekSelection(dayNum) {
+                document.querySelectorAll('.week-day-btn').forEach(btn => {
+                    if (parseInt(btn.getAttribute('data-day')) === dayNum) {
+                        btn.className = 'week-day-btn flex-1 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-sm transition text-center';
+                    } else {
+                        btn.className = 'week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center';
+                    }
+                });
+            }
+
+            // Target Time Mode Dropdown - Automatically opens date picker
             document.getElementById('timeMode').addEventListener('change', (e) => {
                 const customWrap = document.getElementById('customTimeWrapper');
                 if (e.target.value === 'custom') {
                     customWrap.classList.remove('hidden');
+                    setTimeout(() => {
+                        if ('showPicker' in HTMLInputElement.prototype) {
+                            customDtInput.showPicker();
+                        } else {
+                            customDtInput.focus();
+                        }
+                    }, 50);
                 } else {
                     customWrap.classList.add('hidden');
+                    fetchVacantRooms();
                 }
             });
+
+            customDtInput.addEventListener('change', fetchVacantRooms);
 
             async function fetchTimetable() {
                 const dateVal = dateInput.value;
                 const url = `/api/timetable?programme=COMSCI2&date=${dateVal}`;
                 const list = document.getElementById('timetableList');
-                list.innerHTML = '<div class="text-center py-12 text-slate-500 font-medium animate-pulse">Loading classes...</div>';
+                list.innerHTML = '<div class="text-center py-12 text-slate-400 font-medium animate-pulse">Loading schedule...</div>';
 
                 try {
                     const res = await fetch(url);
@@ -367,51 +504,44 @@ def index():
                     list.innerHTML = '';
                     if (data.schedule.length === 0) {
                         list.innerHTML = `
-                            <div class="text-center py-16 glass rounded-2xl border border-slate-800/80">
-                                <span class="text-4xl block mb-2">🎉</span>
-                                <h3 class="text-slate-300 font-bold text-base">No Lectures Scheduled</h3>
-                                <p class="text-xs text-slate-500 mt-1">Enjoy your free day or check vacant halls to find a quiet study room!</p>
+                            <div class="text-center py-16 bg-white border border-slate-200/80 rounded-2xl card-shadow">
+                                <h3 class="text-slate-700 font-bold text-base">No Classes Scheduled</h3>
+                                <p class="text-xs text-slate-400 mt-1">Enjoy your free time or check vacant halls!</p>
                             </div>`;
                         return;
                     }
 
                     data.schedule.forEach(item => {
-                        let badgeStyle = 'bg-blue-500/10 text-blue-400 border-blue-500/20';
+                        let badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
                         if (item.event_type.includes('Lab') || item.event_type.includes('Practical')) {
-                            badgeStyle = 'bg-purple-500/10 text-purple-400 border-purple-500/20';
+                            badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
                         } else if (item.event_type.includes('Tutorial')) {
-                            badgeStyle = 'bg-amber-500/10 text-amber-400 border-amber-500/20';
-                        } else if (item.event_type.includes('Seminar')) {
-                            badgeStyle = 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20';
+                            badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
                         }
 
                         const card = document.createElement('div');
-                        card.className = 'glass border border-slate-800/90 hover:border-slate-700 transition rounded-2xl p-5 shadow-lg flex items-center justify-between gap-4 group';
+                        card.className = 'bg-white border border-slate-200/80 rounded-2xl p-4 card-shadow flex items-center justify-between gap-4';
                         
                         card.innerHTML = `
-                            <div class="flex items-start gap-4">
-                                <div class="bg-blue-600/10 border border-blue-500/20 text-blue-400 rounded-xl px-3.5 py-2 font-bold text-sm text-center shrink-0">
+                            <div class="flex items-start gap-3.5">
+                                <div class="bg-blue-50 border border-blue-100 text-blue-700 rounded-xl px-3 py-2 font-bold text-xs text-center shrink-0">
                                     ${item.time_slot}
                                 </div>
                                 <div>
-                                    <div class="flex items-center gap-2 mb-1">
-                                        <h3 class="text-base font-bold text-white group-hover:text-blue-400 transition">${item.module}</h3>
-                                        <span class="text-[10px] font-extrabold uppercase tracking-wider px-2 py-0.5 rounded-md border ${badgeStyle}">
+                                    <div class="flex flex-wrap items-center gap-2 mb-1">
+                                        <h3 class="text-sm font-bold text-slate-800">${item.module}</h3>
+                                        <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${badgeStyle}">
                                             ${item.event_type}
                                         </span>
                                     </div>
-                                    <div class="flex items-center gap-3 text-xs text-slate-400">
-                                        <span class="flex items-center gap-1 font-medium text-slate-300">
-                                            📍 ${item.room}
-                                        </span>
-                                    </div>
+                                    <p class="text-xs font-semibold text-slate-500">Location: ${item.room}</p>
                                 </div>
                             </div>
                         `;
                         list.appendChild(card);
                     });
                 } catch (err) {
-                    list.innerHTML = '<div class="text-center py-12 text-rose-400">Error loading timetable schedule.</div>';
+                    list.innerHTML = '<div class="text-center py-12 text-rose-500 font-medium">Error loading schedule.</div>';
                 }
             }
 
@@ -420,11 +550,11 @@ def index():
                 const timeMode = document.getElementById('timeMode').value;
                 const theatresOnly = document.getElementById('theatresOnly').checked;
                 
-                let dtParam = timeMode === 'custom' ? document.getElementById('customDatetime').value : '';
+                let dtParam = timeMode === 'custom' ? customDtInput.value : '';
 
                 const url = `/api/vacant?building=${building}&datetime=${dtParam}&theatres_only=${theatresOnly}`;
                 const grid = document.getElementById('resultsGrid');
-                grid.innerHTML = '<div class="col-span-2 text-center py-12 text-slate-500">Checking room availability...</div>';
+                grid.innerHTML = '<div class="col-span-2 text-center py-12 text-slate-400 font-medium">Checking available halls...</div>';
 
                 try {
                     const res = await fetch(url);
@@ -435,34 +565,38 @@ def index():
 
                     grid.innerHTML = '';
                     if (data.vacant.length === 0) {
-                        grid.innerHTML = `<div class="col-span-2 text-center py-12 glass rounded-2xl border border-slate-800"><p class="text-slate-400 font-medium">No vacant halls found.</p></div>`;
+                        grid.innerHTML = `<div class="col-span-2 text-center py-12 bg-white rounded-2xl border border-slate-200"><p class="text-slate-500 font-medium">No vacant halls found.</p></div>`;
                         return;
                     }
 
                     data.vacant.forEach(room => {
                         const card = document.createElement('div');
-                        card.className = 'glass border border-slate-800 hover:border-slate-700 transition rounded-2xl p-5 flex items-center justify-between group shadow-sm';
+                        card.className = 'bg-white border border-slate-200/80 rounded-2xl p-4 card-shadow flex items-center justify-between';
                         card.innerHTML = `
                             <div>
-                                <h3 class="text-lg font-bold text-white group-hover:text-blue-400 transition">${room.name}</h3>
-                                <p class="text-xs text-emerald-400 font-medium mt-1 flex items-center gap-1.5">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                                <h3 class="text-base font-bold text-slate-800">${room.name}</h3>
+                                <p class="text-xs text-emerald-600 font-semibold mt-0.5 flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                     ${room.until}
                                 </p>
                             </div>
-                            <span class="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-xs font-semibold px-3 py-1.5 rounded-xl">Available</span>
+                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-xl">Available</span>
                         `;
                         grid.appendChild(card);
                     });
                 } catch (err) {
-                    grid.innerHTML = '<div class="col-span-2 text-center py-12 text-rose-400">Error fetching room data.</div>';
+                    grid.innerHTML = '<div class="col-span-2 text-center py-12 text-rose-500 font-medium">Error loading room availability.</div>';
                 }
             }
 
             document.getElementById('searchBtn').addEventListener('click', fetchVacantRooms);
             document.getElementById('buildingSelect').addEventListener('change', fetchVacantRooms);
-            document.getElementById('timetableDate').addEventListener('change', fetchTimetable);
+            document.getElementById('timetableDate').addEventListener('change', () => {
+                updateWeekSelection(new Date(dateInput.value).getDay());
+                fetchTimetable();
+            });
 
+            updateWeekSelection(new Date(todayIso).getDay());
             fetchTimetable();
         </script>
     </body>
@@ -471,4 +605,5 @@ def index():
     return render_template_string(html_code, buildings=BUILDINGS)
 
 if __name__ == "__main__":
+    init_db()
     app.run(debug=True, port=5000)
