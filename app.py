@@ -272,26 +272,38 @@ def index():
         <meta name="apple-mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-title" content="DCU Hub">
         <script src="https://cdn.tailwindcss.com"></script>
+        <script>
+            tailwind.config = {
+                darkMode: 'class',
+            }
+        </script>
         <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
         <style>
             body { font-family: 'Plus Jakarta Sans', sans-serif; }
             .card-shadow { box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 6px -1px rgba(0, 0, 0, 0.02); }
+            .dark .card-shadow { box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.4); }
         </style>
     </head>
-    <body class="bg-slate-50 text-slate-800 min-h-screen flex flex-col">
+    <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
 
         <!-- Header -->
-        <header class="bg-blue-700 text-white shadow-lg sticky top-0 z-50">
+        <header class="bg-blue-700 dark:bg-slate-950 text-white shadow-lg sticky top-0 z-50 transition-colors duration-200">
             <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
-                    <div class="bg-white/10 p-2 rounded-xl backdrop-blur-md">
+                    <div class="bg-white/10 dark:bg-slate-800/60 p-2 rounded-xl backdrop-blur-md">
                         <img src="/static/images/logo.png" alt="DCU Logo" class="w-8 h-8 object-contain" onerror="this.style.display='none'">
                     </div>
                     <div>
                         <h1 class="text-xl font-extrabold tracking-tight">DCU Student Hub</h1>
-                        <p class="text-blue-200 text-xs font-medium">COMSCI2 & Campus Live Availability</p>
+                        <p class="text-blue-200 dark:text-slate-400 text-xs font-medium">COMSCI2 & Campus Live Availability</p>
                     </div>
                 </div>
+
+                <!-- Theme Toggle Button -->
+                <button id="themeToggle" class="bg-white/10 hover:bg-white/20 dark:bg-slate-800 dark:hover:bg-slate-700 text-white p-2.5 rounded-xl backdrop-blur-md transition flex items-center justify-center">
+                    <svg id="sunIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
+                    <svg id="moonIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path></svg>
+                </button>
             </div>
 
             <!-- Navigation Tabs -->
@@ -299,7 +311,7 @@ def index():
                 <button id="tabTimetable" class="px-5 py-3 border-b-2 border-white font-bold text-sm text-white flex items-center gap-2">
                     Timetable
                 </button>
-                <button id="tabVacant" class="px-5 py-3 border-b-2 border-transparent font-medium text-sm text-blue-200 hover:text-white flex items-center gap-2">
+                <button id="tabVacant" class="px-5 py-3 border-b-2 border-transparent font-medium text-sm text-blue-200 dark:text-slate-400 hover:text-white flex items-center gap-2">
                     Vacant Halls
                 </button>
             </div>
@@ -310,25 +322,25 @@ def index():
 
             <!-- PANEL 1: Timetable -->
             <div id="timetablePanel">
-                <div class="bg-white border border-slate-200/80 rounded-2xl p-4 mb-6 card-shadow space-y-3">
-                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 mb-6 card-shadow space-y-3 transition-colors">
+                    <div class="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 dark:border-slate-700/60 pb-3">
                         <div class="flex items-center gap-2">
                             <button id="btnToday" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2 rounded-xl transition shadow-sm">Today</button>
-                            <button id="btnTomorrow" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs px-4 py-2 rounded-xl transition">Tomorrow</button>
+                            <button id="btnTomorrow" class="bg-slate-100 hover:bg-slate-200 dark:bg-slate-700 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-200 font-bold text-xs px-4 py-2 rounded-xl transition">Tomorrow</button>
                         </div>
                         <div class="flex items-center gap-2 w-full sm:w-auto cursor-pointer" id="timetableDateWrapper">
-                            <label class="text-xs font-semibold text-slate-500 whitespace-nowrap cursor-pointer">Specific Date:</label>
-                            <input type="date" id="timetableDate" class="bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-blue-600 focus:outline-none w-full cursor-pointer">
+                            <label class="text-xs font-semibold text-slate-500 dark:text-slate-400 whitespace-nowrap cursor-pointer">Specific Date:</label>
+                            <input type="date" id="timetableDate" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold rounded-xl px-3 py-1.5 focus:ring-2 focus:ring-blue-600 focus:outline-none w-full cursor-pointer">
                         </div>
                     </div>
 
                     <!-- Week Day Selector Bar -->
                     <div class="flex items-center justify-between gap-1 pt-1">
-                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="1">Mon</button>
-                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="2">Tue</button>
-                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="3">Wed</button>
-                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="4">Thu</button>
-                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center" data-day="5">Fri</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 transition text-center" data-day="1">Mon</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 transition text-center" data-day="2">Tue</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 transition text-center" data-day="3">Wed</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 transition text-center" data-day="4">Thu</button>
+                        <button class="week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 transition text-center" data-day="5">Fri</button>
                     </div>
                 </div>
 
@@ -337,32 +349,32 @@ def index():
 
             <!-- PANEL 2: Vacant Halls -->
             <div id="vacantPanel" class="hidden">
-                <div class="bg-white border border-slate-200/80 rounded-2xl p-5 mb-6 card-shadow">
+                <div class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-5 mb-6 card-shadow transition-colors">
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Select Building</label>
-                            <select id="buildingSelect" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">Select Building</label>
+                            <select id="buildingSelect" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
                                 {% for code, label in buildings.items() %}
                                 <option value="{{ code }}">{{ label }}</option>
                                 {% endfor %}
                             </select>
                         </div>
                         <div>
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Target Time Mode</label>
-                            <select id="timeMode" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">Target Time Mode</label>
+                            <select id="timeMode" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
                                 <option value="now">Right Now (Live)</option>
                                 <option value="custom">Custom Date & Time</option>
                             </select>
                         </div>
                         <div id="customTimeWrapper" class="hidden">
-                            <label class="block text-xs font-bold text-slate-600 mb-1.5">Pick Date & Time</label>
-                            <input type="datetime-local" id="customDatetime" class="w-full bg-slate-50 border border-slate-200 text-slate-800 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
+                            <label class="block text-xs font-bold text-slate-600 dark:text-slate-300 mb-1.5">Pick Date & Time</label>
+                            <input type="datetime-local" id="customDatetime" class="w-full bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-100 text-xs font-semibold rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-blue-600 focus:outline-none cursor-pointer">
                         </div>
                     </div>
 
-                    <div class="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between flex-wrap gap-3">
-                        <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600">
-                            <input type="checkbox" id="theatresOnly" checked class="w-4 h-4 rounded text-blue-600 bg-slate-100 border-slate-300 focus:ring-blue-600">
+                    <div class="mt-4 pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between flex-wrap gap-3">
+                        <label class="flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-600 dark:text-slate-300">
+                            <input type="checkbox" id="theatresOnly" checked class="w-4 h-4 rounded text-blue-600 bg-slate-100 dark:bg-slate-900 border-slate-300 dark:border-slate-700 focus:ring-blue-600">
                             Lecture Theatres Only
                         </label>
                         <button id="searchBtn" class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-5 py-2.5 rounded-xl transition shadow-md shadow-blue-600/20">
@@ -372,8 +384,8 @@ def index():
                 </div>
 
                 <div class="flex items-center justify-between mb-4 px-1">
-                    <h2 id="querySummary" class="text-slate-600 font-semibold text-xs">Searching...</h2>
-                    <span id="roomCountBadge" class="text-xs font-bold bg-blue-50 text-blue-700 px-3 py-1 rounded-full border border-blue-100">0 Rooms Found</span>
+                    <h2 id="querySummary" class="text-slate-600 dark:text-slate-400 font-semibold text-xs">Searching...</h2>
+                    <span id="roomCountBadge" class="text-xs font-bold bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-3 py-1 rounded-full border border-blue-100 dark:border-blue-800">0 Rooms Found</span>
                 </div>
 
                 <div id="resultsGrid" class="grid grid-cols-1 md:grid-cols-2 gap-3"></div>
@@ -381,6 +393,35 @@ def index():
         </main>
 
         <script>
+            // Dark Mode Initialization & Toggle
+            const themeToggleBtn = document.getElementById('themeToggle');
+            const sunIcon = document.getElementById('sunIcon');
+            const moonIcon = document.getElementById('moonIcon');
+
+            function applyTheme(isDark) {
+                if (isDark) {
+                    document.documentElement.classList.add('dark');
+                    sunIcon.classList.remove('hidden');
+                    moonIcon.classList.add('hidden');
+                } else {
+                    document.documentElement.classList.remove('dark');
+                    sunIcon.classList.add('hidden');
+                    moonIcon.classList.remove('hidden');
+                }
+            }
+
+            const storedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const isInitiallyDark = storedTheme === 'dark' || (!storedTheme && prefersDark);
+            applyTheme(isInitiallyDark);
+
+            themeToggleBtn.addEventListener('click', () => {
+                const isCurrentDark = document.documentElement.classList.contains('dark');
+                const newTheme = !isCurrentDark;
+                applyTheme(newTheme);
+                localStorage.setItem('theme', newTheme ? 'dark' : 'light');
+            });
+
             if ('serviceWorker' in navigator) {
                 navigator.serviceWorker.register('/sw.js');
             }
@@ -399,7 +440,6 @@ def index():
             const dateInput = document.getElementById('timetableDate');
             dateInput.value = todayIso;
 
-            // Auto open picker when clicking input or label
             document.getElementById('timetableDateWrapper').addEventListener('click', () => {
                 if ('showPicker' in HTMLInputElement.prototype) {
                     dateInput.showPicker();
@@ -416,7 +456,7 @@ def index():
 
             function resetTabs() {
                 [tabTimetable, tabVacant].forEach(t => {
-                    t.className = 'px-5 py-3 border-b-2 border-transparent font-medium text-sm text-blue-200 hover:text-white flex items-center gap-2';
+                    t.className = 'px-5 py-3 border-b-2 border-transparent font-medium text-sm text-blue-200 dark:text-slate-400 hover:text-white flex items-center gap-2';
                 });
                 [timetablePanel, vacantPanel].forEach(p => p.classList.add('hidden'));
             }
@@ -466,12 +506,11 @@ def index():
                     if (parseInt(btn.getAttribute('data-day')) === dayNum) {
                         btn.className = 'week-day-btn flex-1 py-2 rounded-xl text-xs font-extrabold bg-blue-600 text-white shadow-sm transition text-center';
                     } else {
-                        btn.className = 'week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-blue-50 transition text-center';
+                        btn.className = 'week-day-btn flex-1 py-2 rounded-xl text-xs font-bold text-slate-600 dark:text-slate-300 hover:bg-blue-50 dark:hover:bg-slate-700 transition text-center';
                     }
                 });
             }
 
-            // Target Time Mode Dropdown - Automatically opens date picker
             document.getElementById('timeMode').addEventListener('change', (e) => {
                 const customWrap = document.getElementById('customTimeWrapper');
                 if (e.target.value === 'custom') {
@@ -504,37 +543,37 @@ def index():
                     list.innerHTML = '';
                     if (data.schedule.length === 0) {
                         list.innerHTML = `
-                            <div class="text-center py-16 bg-white border border-slate-200/80 rounded-2xl card-shadow">
-                                <h3 class="text-slate-700 font-bold text-base">No Classes Scheduled</h3>
+                            <div class="text-center py-16 bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl card-shadow">
+                                <h3 class="text-slate-700 dark:text-slate-200 font-bold text-base">No Classes Scheduled</h3>
                                 <p class="text-xs text-slate-400 mt-1">Enjoy your free time or check vacant halls!</p>
                             </div>`;
                         return;
                     }
 
                     data.schedule.forEach(item => {
-                        let badgeStyle = 'bg-blue-50 text-blue-700 border-blue-200';
+                        let badgeStyle = 'bg-blue-50 dark:bg-blue-950 text-blue-700 dark:text-blue-300 border-blue-200 dark:border-blue-800';
                         if (item.event_type.includes('Lab') || item.event_type.includes('Practical')) {
-                            badgeStyle = 'bg-purple-50 text-purple-700 border-purple-200';
+                            badgeStyle = 'bg-purple-50 dark:bg-purple-950 text-purple-700 dark:text-purple-300 border-purple-200 dark:border-purple-800';
                         } else if (item.event_type.includes('Tutorial')) {
-                            badgeStyle = 'bg-amber-50 text-amber-700 border-amber-200';
+                            badgeStyle = 'bg-amber-50 dark:bg-amber-950 text-amber-700 dark:text-amber-300 border-amber-200 dark:border-amber-800';
                         }
 
                         const card = document.createElement('div');
-                        card.className = 'bg-white border border-slate-200/80 rounded-2xl p-4 card-shadow flex items-center justify-between gap-4';
+                        card.className = 'bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 card-shadow flex items-center justify-between gap-4 transition-colors';
                         
                         card.innerHTML = `
                             <div class="flex items-start gap-3.5">
-                                <div class="bg-blue-50 border border-blue-100 text-blue-700 rounded-xl px-3 py-2 font-bold text-xs text-center shrink-0">
+                                <div class="bg-blue-50 dark:bg-slate-900 border border-blue-100 dark:border-slate-700 text-blue-700 dark:text-blue-400 rounded-xl px-3 py-2 font-bold text-xs text-center shrink-0">
                                     ${item.time_slot}
                                 </div>
                                 <div>
                                     <div class="flex flex-wrap items-center gap-2 mb-1">
-                                        <h3 class="text-sm font-bold text-slate-800">${item.module}</h3>
+                                        <h3 class="text-sm font-bold text-slate-800 dark:text-slate-100">${item.module}</h3>
                                         <span class="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-md border ${badgeStyle}">
                                             ${item.event_type}
                                         </span>
                                     </div>
-                                    <p class="text-xs font-semibold text-slate-500">Location: ${item.room}</p>
+                                    <p class="text-xs font-semibold text-slate-500 dark:text-slate-400">Location: ${item.room}</p>
                                 </div>
                             </div>
                         `;
@@ -565,22 +604,22 @@ def index():
 
                     grid.innerHTML = '';
                     if (data.vacant.length === 0) {
-                        grid.innerHTML = `<div class="col-span-2 text-center py-12 bg-white rounded-2xl border border-slate-200"><p class="text-slate-500 font-medium">No vacant halls found.</p></div>`;
+                        grid.innerHTML = `<div class="col-span-2 text-center py-12 bg-white dark:bg-slate-800 rounded-2xl border border-slate-200 dark:border-slate-700"><p class="text-slate-500 dark:text-slate-400 font-medium">No vacant halls found.</p></div>`;
                         return;
                     }
 
                     data.vacant.forEach(room => {
                         const card = document.createElement('div');
-                        card.className = 'bg-white border border-slate-200/80 rounded-2xl p-4 card-shadow flex items-center justify-between';
+                        card.className = 'bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 card-shadow flex items-center justify-between transition-colors';
                         card.innerHTML = `
                             <div>
-                                <h3 class="text-base font-bold text-slate-800">${room.name}</h3>
-                                <p class="text-xs text-emerald-600 font-semibold mt-0.5 flex items-center gap-1.5">
+                                <h3 class="text-base font-bold text-slate-800 dark:text-slate-100">${room.name}</h3>
+                                <p class="text-xs text-emerald-600 dark:text-emerald-400 font-semibold mt-0.5 flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                                     ${room.until}
                                 </p>
                             </div>
-                            <span class="bg-emerald-50 text-emerald-700 border border-emerald-200 text-xs font-bold px-3 py-1 rounded-xl">Available</span>
+                            <span class="bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 text-xs font-bold px-3 py-1 rounded-xl">Available</span>
                         `;
                         grid.appendChild(card);
                     });
