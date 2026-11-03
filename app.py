@@ -98,8 +98,8 @@ def manifest():
             }
         ],
         "start_url": "/",
-        "background_color": "#2563eb",
-        "theme_color": "#1d4ed8",
+        "background_color": "#020617",
+        "theme_color": "#020617",
         "display": "standalone"
     })
 
@@ -264,12 +264,13 @@ def index():
     <html lang="en">
     <head>
         <meta charset="UTF-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
         <title>DCU Student Hub</title>
         <link rel="manifest" href="/manifest.json">
-        <meta name="theme-color" content="#1d4ed8">
+        <meta name="theme-color" id="themeColorMeta" content="#1d4ed8">
         <meta name="mobile-web-app-capable" content="yes">
         <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
         <meta name="apple-mobile-web-app-title" content="DCU Hub">
         <script src="https://cdn.tailwindcss.com"></script>
         <script>
@@ -287,7 +288,7 @@ def index():
     <body class="bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 min-h-screen flex flex-col transition-colors duration-200">
 
         <!-- Header -->
-        <header class="bg-blue-700 dark:bg-slate-950 text-white shadow-lg sticky top-0 z-50 transition-colors duration-200">
+        <header class="bg-blue-700 dark:bg-slate-950 text-white shadow-lg sticky top-0 z-50 transition-colors duration-200 pt-pt-safe">
             <div class="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
                 <div class="flex items-center gap-3">
                     <div class="bg-white/10 dark:bg-slate-800/60 p-2 rounded-xl backdrop-blur-md">
@@ -393,20 +394,23 @@ def index():
         </main>
 
         <script>
-            // Dark Mode Initialization & Toggle
+            // Dark Mode Initialization & Dynamic Meta Tag Handler
             const themeToggleBtn = document.getElementById('themeToggle');
             const sunIcon = document.getElementById('sunIcon');
             const moonIcon = document.getElementById('moonIcon');
+            const themeMeta = document.getElementById('themeColorMeta');
 
             function applyTheme(isDark) {
                 if (isDark) {
                     document.documentElement.classList.add('dark');
                     sunIcon.classList.remove('hidden');
                     moonIcon.classList.add('hidden');
+                    if (themeMeta) themeMeta.setAttribute('content', '#020617');
                 } else {
                     document.documentElement.classList.remove('dark');
-                    sunIcon.classList.add('hidden');
+                    sunIcon.add && sunIcon.classList.add('hidden');
                     moonIcon.classList.remove('hidden');
+                    if (themeMeta) themeMeta.setAttribute('content', '#1d4ed8');
                 }
             }
 
