@@ -89,12 +89,14 @@ def manifest():
             {
                 "src": "/static/images/icon-192.png",
                 "type": "image/png",
-                "sizes": "192x192"
+                "sizes": "192x192",
+                "purpose": "any maskable"
             },
             {
                 "src": "/static/images/icon-512.png",
                 "type": "image/png",
-                "sizes": "512x512"
+                "sizes": "512x512",
+                "purpose": "any maskable"
             }
         ],
         "start_url": "/",
@@ -408,7 +410,7 @@ def index():
                     if (themeMeta) themeMeta.setAttribute('content', '#020617');
                 } else {
                     document.documentElement.classList.remove('dark');
-                    sunIcon.add && sunIcon.classList.add('hidden');
+                    sunIcon.classList.add('hidden');
                     moonIcon.classList.remove('hidden');
                     if (themeMeta) themeMeta.setAttribute('content', '#1d4ed8');
                 }
